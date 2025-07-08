@@ -1,40 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# AntreanX
 
-## Getting Started
+A lightweight and efficient queue management system built with **Next.js**, **Tailwind CSS**, and **Prisma (SQLite)**. Designed for front desk service operations such as complaint intake and queue tracking, this project is well-suited for local service centers, including use at **PT Telkom Indonesia (IndiHome/IndiBiz Sulbagsel)**.
 
-First, run the development server:
+---
+
+## 🚀 Features
+
+* 🎫 Auto-generated queue numbers (e.g., `A001`)
+* 📝 Public complaint form with:
+
+  * Category dropdown
+  * Device type dropdown (Modem, AP, STB)
+  * No Internet input
+* 🔐 Admin authentication using **NextAuth (Credentials Provider)**
+* 📊 Admin dashboard with:
+
+  * Real-time complaint listing
+  * Status transitions: `Menunggu` → `Diproses` → `Selesai`
+  * Metrics: total, waiting, processing, done
+  * Pagination (5 items per page)
+  * Completed complaints list
+* 🖨️ Printable queue ticket (struk antrian)
+* 📁 Export complaints to CSV
+* 📌 Modal confirmation with queue details after submission
+
+---
+
+## 🛠️ Tech Stack
+
+* **Next.js** (App Router disabled)
+* **Tailwind CSS** for styling
+* **TypeScript**
+* **Prisma ORM** with SQLite
+* **NextAuth.js** for session-based auth
+* **FileSaver.js** for CSV export
+
+---
+
+## 🖥️ Screenshots
+
+*(Insert your own screenshots here)*
+
+---
+
+## 📦 Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/your-username/AntreanX.git
+cd frontdeskpro
+
+# Install dependencies
+npm install
+
+# Generate Prisma client
+npx prisma generate
+
+# Run database migration
+npx prisma migrate dev --name init
+
+# Start the development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+## 🔐 Environment Variables
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+Create a `.env` file and add:
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+```env
+NEXTAUTH_SECRET=your_secret_key
+NEXTAUTH_URL=http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 💡 Ideas for Future Improvement
 
-To learn more about Next.js, take a look at the following resources:
+* Live queue updates with WebSockets or polling
+* Multi-admin support
+* Search/filter capabilities
+* Print preview customization
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📄 License
 
-## Deploy on Vercel
+MIT License. Feel free to use and modify for your own purposes.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+> Made with ❤️ by [AlDev](mailto:mhdalif.id@gmail.com)
