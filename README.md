@@ -48,7 +48,7 @@ A lightweight and efficient queue management system built with **Next.js**, **Ta
 ```bash
 # Clone the repository
 git clone https://github.com/your-username/AntreanX.git
-cd frontdeskpro
+cd antreanx
 
 # Install dependencies
 npm install
