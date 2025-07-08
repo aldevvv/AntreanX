@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  password       String
+  emailVerified  DateTime?
+  sessions       Session[]
+}
+
+model Complaint {
+  id         Int      @id @default(autoincrement())
+  name       String
+  company    String
+  phone      String
+  complaint  String
+  createdAt  DateTime @default(now())
+  queueNumber String? @unique
+  category    String?  
+  deviceType  String?  
+  noInternet  String?  
+  status      String   @default("Menunggu") 
+
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  expires      DateTime
+}
