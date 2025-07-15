@@ -197,15 +197,14 @@ export default function Home() {
                     required
                   >
                     <option value="">Pilih kategori keluhan</option>
-                    <option value="Gangguan Internet">🌐 Gangguan Internet</option>
-                    <option value="Permintaan Teknisi">🔧 Permintaan Teknisi</option>
-                    <option value="Layanan Tambahan">➕ Layanan Tambahan</option>
+                    <option value="Gangguan Internet">🌐 Gangguan Layanan</option>
+                    <option value="Layanan Tambahan">➕ Penambahan Layanan</option>
                   </select>
                 </div>
 
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-700">
-                    Jenis Perangkat <span className="text-red-500">*</span>
+                    Jenis Layanan <span className="text-red-500">*</span>
                   </label>
                   <select
                     name="deviceType"
@@ -214,10 +213,11 @@ export default function Home() {
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
                     required
                   >
-                    <option value="">Pilih jenis perangkat</option>
-                    <option value="Modem">📡 Modem</option>
-                    <option value="AP">📶 Access Point (AP)</option>
-                    <option value="STB">📺 Set Top Box (STB)</option>
+                    <option value="">Pilih jenis layanan</option>
+                    <option value="Modem">🏢 Indibiz</option>
+                    <option value="AP">📶 WMS/WIFI.ID</option>
+                    <option value="STB">🌐 Astinet</option>
+                    <option value="STB">❓ Lainnya</option>
                   </select>
                 </div>
               </div>

@@ -17,18 +17,18 @@ model User {
 }
 
 model Complaint {
-  id         Int      @id @default(autoincrement())
-  name       String
-  company    String
-  phone      String
-  complaint  String
-  createdAt  DateTime @default(now())
-  queueNumber String? @unique
+  id          Int      @id @default(autoincrement())
+  name        String
+  company     String
+  phone       String
+  complaint   String
+  createdAt   DateTime @default(now())
+  queueNumber String?  @unique
   category    String?  
   deviceType  String?  
   noInternet  String?  
-  status      String   @default("Menunggu") 
-
+  status      String   @default("Menunggu")
+  notes       String?
 }
 
 model Session {

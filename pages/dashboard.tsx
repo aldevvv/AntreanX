@@ -15,18 +15,75 @@ type Complaint = {
   noInternet?: string;
   status: string;
   createdAt: string;
+  notes?: string;
 };
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [finishedPage, setFinishedPage] = useState(1); 
+  const [finishedPage, setFinishedPage] = useState(1);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
+  const [tempNotes, setTempNotes] = useState<{ [key: string]: string }>({});
   const itemsPerPage = 5;
+  const [showDropdown, setShowDropdown] = useState<string | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingComplaint, setEditingComplaint] = useState<Complaint | null>(null);
+  const [editFormData, setEditFormData] = useState<Partial<Complaint>>({});
+  const [dateFilter, setDateFilter] = useState<'all' | '1day' | '7days' | '30days'>('all');
+  const [showDateFilter, setShowDateFilter] = useState(false);
+
+  const getFilterLabel = () => {
+    switch (dateFilter) {
+      case '1day':
+        return 'Hari Ini';
+      case '7days':
+        return '7 Hari Terakhir';
+      case '30days':
+        return '30 Hari Terakhir';
+      default:
+        return 'Semua Data';
+    }
+  };
+
+  const getFilteredComplaints = () => {
+    const finishedComplaints = complaints.filter(c => c.status === "Selesai");
+    
+    if (dateFilter === 'all') {
+      return finishedComplaints;
+    }
+    
+    const now = new Date();
+    const filterDate = new Date();
+    
+    switch (dateFilter) {
+      case '1day':
+        filterDate.setDate(now.getDate() - 1);
+        break;
+      case '7days':
+        filterDate.setDate(now.getDate() - 7);
+        break;
+      case '30days':
+        filterDate.setDate(now.getDate() - 30);
+        break;
+      default:
+        return finishedComplaints;
+    }
+    
+    return finishedComplaints.filter(c => new Date(c.createdAt) >= filterDate);
+  };
 
   useEffect(() => {
     if (status === "authenticated") {
       fetchComplaints();
+      
+      // Auto refresh every 30 seconds
+      const interval = setInterval(() => {
+        fetchComplaints();
+      }, 30000);
+
+      return () => clearInterval(interval);
     }
   }, [status]);
 
@@ -38,9 +95,19 @@ export default function DashboardPage() {
   }, [complaints]);
 
   const fetchComplaints = async () => {
-    const res = await fetch("/api/complaints");
-    const data = await res.json();
-    setComplaints(data);
+    try {
+      const res = await fetch("/api/complaints");
+      if (!res.ok) {
+        // If the response wasn't ok, throw an error
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      const data = await res.json();
+      setComplaints(data);
+    } catch (error) {
+      console.error("Error fetching complaints:", error);
+      // You might want to set some error state here
+      setComplaints([]);
+    }
   };
 
   const updateStatus = async (id: string, status: string) => {
@@ -51,6 +118,115 @@ export default function DashboardPage() {
     });
     fetchComplaints();
   };
+
+const updateNotes = async (id: string, notes: string) => {
+  await fetch("/api/complaints", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, notes }),
+  });
+  // fetchComplaints akan update complaints state, tapi selectedComplaint harus diupdate manual agar sinkron
+  await fetchComplaints();
+  setSelectedComplaint((prev) => {
+    if (prev && prev.id === id) {
+      // Cari data terbaru dari complaints state
+      const updated = complaints.find((c) => c.id === id);
+      if (updated) return updated;
+      return { ...prev, notes };
+    }
+    return prev;
+  });
+};
+
+const handleNotesChange = (id: string, value: string) => {
+  setTempNotes(prev => ({ ...prev, [id]: value }));
+};
+
+const saveNotes = async (id: string) => {
+  const notes = tempNotes[id] || "";
+  await updateNotes(id, notes);
+  setTempNotes((prev) => {
+    const newNotes = { ...prev };
+    delete newNotes[id];
+    return newNotes;
+  });
+};
+
+const deleteComplaint = async (id: string) => {
+  if (confirm("Apakah Anda yakin ingin menghapus antrian ini?")) {
+    await fetch("/api/complaints", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    fetchComplaints();
+  }
+};
+
+const resetQueue = async () => {
+  if (confirm("Apakah Anda yakin ingin mereset semua nomor antrian hari ini? Tindakan ini tidak dapat dibatalkan!")) {
+    try {
+      await fetch("/api/complaints", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset_queue" }),
+      });
+      fetchComplaints();
+      alert("Nomor antrian berhasil direset!");
+    } catch (error) {
+      console.error("Error resetting queue:", error);
+      alert("Gagal mereset nomor antrian!");
+    }
+  }
+};
+
+const openEditModal = (complaint: Complaint) => {
+  setEditingComplaint(complaint);
+  setEditFormData({
+    name: complaint.name,
+    company: complaint.company,
+    phone: complaint.phone,
+    complaint: complaint.complaint,
+    category: complaint.category,
+    deviceType: complaint.deviceType,
+    noInternet: complaint.noInternet,
+  });
+  setShowEditModal(true);
+  setShowDropdown(null);
+};
+
+const updateComplaint = async () => {
+  if (!editingComplaint) return;
+  
+  await fetch("/api/complaints", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ 
+      id: editingComplaint.id, 
+      ...editFormData 
+    }),
+  });
+  
+  setShowEditModal(false);
+  setEditingComplaint(null);
+  setEditFormData({});
+  fetchComplaints();
+};
+
+const toggleDropdown = (id: string) => {
+  setShowDropdown(prev => (prev === id ? null : id));
+};
+
+const showComplaintDetail = (complaint: Complaint) => {
+  // Ambil data terbaru dari state agar notes selalu update
+  const latest = complaints.find((x) => x.id === complaint.id);
+  if (latest) {
+    setSelectedComplaint(latest);
+  } else {
+    setSelectedComplaint(complaint);
+  }
+  setShowDetailModal(true);
+};
 
   const printTicket = (c: Complaint) => {
     const popup = window.open("", "_blank", "width=400,height=600");
@@ -80,40 +256,70 @@ export default function DashboardPage() {
     popup?.document.close();
   };
 
-  const exportToCSV = () => {
-    const header = [
-      "No Antrian",
-      "Nama",
-      "Perusahaan",
-      "Telepon",
-      "Keluhan",
-      "Kategori",
-      "Device",
-      "No Internet",
-      "Status",
-      "Waktu",
-    ];
-    const rows = complaints.map((c) => [
-      c.queueNumber,
-      c.name,
-      c.company,
-      c.phone,
-      c.complaint,
-      c.category || "-",
-      c.deviceType || "-",
-      c.noInternet || "-",
-      c.status,
-      new Date(c.createdAt).toLocaleString("id-ID"),
-    ]);
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [header, ...rows].map((e) => e.join(",")).join("\n");
+const exportToCSV = () => {
+  const header = [
+    "No Antrian",
+    "Nama",
+    "Perusahaan",
+    "Telepon",
+    "Keluhan",
+    "Kategori",
+    "Device",
+    "No Internet",
+    "Status",
+    "Waktu",
+    "Catatan"
+  ];
+  
+  // Gunakan data complaints langsung, bukan getFilteredComplaints()
+  let dataToExport = complaints;
+  
+  // Filter berdasarkan dateFilter jika bukan 'all'
+  if (dateFilter !== 'all') {
+    const now = new Date();
+    const filterDate = new Date();
+    
+    switch (dateFilter) {
+      case '1day':
+        filterDate.setDate(now.getDate() - 1);
+        break;
+      case '7days':
+        filterDate.setDate(now.getDate() - 7);
+        break;
+      case '30days':
+        filterDate.setDate(now.getDate() - 30);
+        break;
+    }
+    
+    dataToExport = complaints.filter(c => 
+      c.status === "Selesai" && new Date(c.createdAt) >= filterDate
+    );
+  } else {
+    dataToExport = complaints.filter(c => c.status === "Selesai");
+  }
+  
+  const rows = dataToExport.map((c) => [
+    c.queueNumber,
+    c.name,
+    c.company,
+    c.phone,
+    c.complaint,
+    c.category || "-",
+    c.deviceType || "-",
+    c.noInternet || "-",
+    c.status,
+    new Date(c.createdAt).toLocaleString("id-ID"),
+    c.notes || "-"
+  ]);
 
-    const blob = new Blob([decodeURIComponent(encodeURI(csvContent))], {
-      type: "text/csv;charset=utf-8;",
-    });
-    saveAs(blob, "antrian_pengaduan.csv");
-  };
+  const csvContent =
+    "data:text/csv;charset=utf-8," +
+    [header, ...rows].map((e) => e.join(",")).join("\n");
+  const blob = new Blob([decodeURIComponent(encodeURI(csvContent))], {
+    type: "text/csv;charset=utf-8;",
+  });
+  saveAs(blob, "antrian_pengaduan.csv");
+};
 
   if (status === "loading") {
     return (
@@ -143,11 +349,13 @@ export default function DashboardPage() {
   }
 
   const activeComplaints = complaints.filter((c) => c.status !== "Selesai");
-  const finished = complaints.filter((c) => c.status === "Selesai");
+  const finished = complaints
+  .filter((c) => c.status === "Selesai")
+  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const paginatedOngoing = activeComplaints.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage  
   );
 
   const ongoing = paginatedOngoing;
@@ -160,7 +368,8 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" onClick={() => { setShowDropdown(null); setShowDateFilter(false); }}>
+      <div className="relative" onClick={(e) => e.stopPropagation()}></div>
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -274,26 +483,96 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Export Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Kelola Data Antrian</h2>
-                <p className="text-sm text-gray-600">Export dan kelola data antrian pelanggan</p>
-              </div>
-              <button
-                onClick={exportToCSV}
-                className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span>Export ke CSV</span>
-              </button>
-            </div>
-          </div>
+       {/* Export Section */}
+<div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
+  <div className="px-6 py-4 border-b border-gray-200">
+    <div className="flex justify-between items-center">
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900">Kelola Data Antrian</h2>
+        <p className="text-sm text-gray-600">Export dan kelola data antrian pelanggan</p>
+      </div>
+      <div className="flex items-center space-x-3">
+        <div className="text-sm text-gray-600">
+          Filter: <span className="font-medium">{getFilterLabel()}</span>
         </div>
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowDateFilter(!showDateFilter);
+            }}
+            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span>Pilih Periode</span>
+          </button>
+          
+          {showDateFilter && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10" onClick={(e) => e.stopPropagation()}>
+              <div className="py-1">
+                <button
+                  onClick={() => {
+                    setDateFilter('all');
+                    setShowDateFilter(false);
+                  }}
+                  className={`block w-full text-left px-4 py-2 text-sm transition-colors ${
+                    dateFilter === 'all' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  Semua Data
+                </button>
+                <button
+                  onClick={() => {
+                    setDateFilter('1day');
+                    setShowDateFilter(false);
+                  }}
+                  className={`block w-full text-left px-4 py-2 text-sm transition-colors ${
+                    dateFilter === '1day' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  Hari Ini
+                </button>
+                <button
+                  onClick={() => {
+                    setDateFilter('7days');
+                    setShowDateFilter(false);
+                  }}
+                  className={`block w-full text-left px-4 py-2 text-sm transition-colors ${
+                    dateFilter === '7days' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  7 Hari Terakhir
+                </button>
+                <button
+                  onClick={() => {
+                    setDateFilter('30days');
+                    setShowDateFilter(false);
+                  }}
+                  className={`block w-full text-left px-4 py-2 text-sm transition-colors ${
+                    dateFilter === '30days' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  30 Hari Terakhir
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        <button
+          onClick={exportToCSV}
+          className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <span>Export ke CSV ({getFilteredComplaints().length} data)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
         {/* Active Queue */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
@@ -377,6 +656,18 @@ export default function DashboardPage() {
                       <h4 className="text-sm font-medium text-gray-900 mb-2">Detail Keluhan:</h4>
                       <p className="text-sm text-gray-700 leading-relaxed">{c.complaint}</p>
                     </div>
+
+                    <div className="bg-white rounded-lg p-4 border-l-4 border-blue-500 mt-4">
+  <h4 className="text-sm font-medium text-gray-900 mb-2">Catatan:</h4>
+  <textarea
+    className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    placeholder="Tulis catatan untuk pasien ini..."
+    rows={3}
+    value={tempNotes[c.id] ?? c.notes ?? ""}
+    onChange={(e) => handleNotesChange(c.id, e.target.value)}
+    onBlur={() => saveNotes(c.id)}
+  />
+</div>
 
                     <div className="flex justify-between items-center">
                       <div className="flex items-center space-x-3">
@@ -493,34 +784,91 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-4">
                 {paginatedFinished.map((c) => (
-                  <div key={c.id} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                  <div key={c.id} onClick={e => e.stopPropagation()} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
                     <div className="flex justify-between items-center">
-                      <div className="flex items-center space-x-3">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                          {c.queueNumber}
-                        </span>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{c.name}</h3>
-                          <div className="flex items-center space-x-4 text-sm text-gray-500">
-                            <span>{c.category || "-"}</span>
-                            <span>{c.deviceType || "-"}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs text-gray-500">
-                          {new Date(c.createdAt).toLocaleDateString("id-ID", {
-                            day: "2-digit",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </div>
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Selesai
-                        </span>
-                      </div>
-                    </div>
+  <div className="flex items-center space-x-3">
+    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+      {c.queueNumber}
+    </span>
+    <div>
+      <h3 className="font-semibold text-gray-900">{c.name}</h3>
+      <div className="flex items-center space-x-4 text-sm text-gray-500">
+        <span>{c.category || "-"}</span>
+        <span>{c.deviceType || "-"}</span>
+      </div>
+    </div>
+  </div>
+  <div className="flex items-center space-x-3">
+    <div className="text-right">
+      <div className="text-xs text-gray-500">
+        {new Date(c.createdAt).toLocaleDateString("id-ID", {
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
+      </div>
+      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        Selesai
+      </span>
+    </div>
+<div className="relative">
+  <button
+    onClick={() => toggleDropdown(c.id)}
+    className="inline-flex items-center justify-center w-8 h-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+    title="Opsi"
+  >
+    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+    </svg>
+  </button>
+  
+  {showDropdown === c.id && (
+    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+      <div className="py-1">
+        <button
+          onClick={() => {
+            showComplaintDetail(c);
+            setShowDropdown(null);
+          }}
+          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+        >
+          <div className="flex items-center space-x-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Lihat Detail</span>
+          </div>
+        </button>
+        <button
+          onClick={() => openEditModal(c)}
+          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+        >
+          <div className="flex items-center space-x-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span>Edit</span>
+          </div>
+        </button>
+        <button
+          onClick={() => deleteComplaint(c.id)}
+          className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+        >
+          <div className="flex items-center space-x-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>Hapus</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  )}
+</div>
+    
+  </div>
+</div>
                   </div>
                 ))}
               </div>
@@ -569,6 +917,178 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+       {/* MODAL DETAIL */}
+      {showDetailModal && selectedComplaint && (
+        (() => {
+          // Ambil data complaint terbaru dari state agar notes selalu update
+          const latest = complaints.find((x) => x.id === selectedComplaint.id) || selectedComplaint;
+          return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center p-6 border-b">
+                  <h2 className="text-xl font-semibold text-gray-900">Detail Pelanggan</h2>
+                  <button
+                    onClick={() => setShowDetailModal(false)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    aria-label="Tutup Modal"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500">Nama</h3>
+                      <p className="text-gray-900">{latest.name}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500">Nomor Antrian</h3>
+                      <p className="text-gray-900">{latest.queueNumber}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500">Perusahaan</h3>
+                      <p className="text-gray-900">{latest.company}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500">Telepon</h3>
+                      <p className="text-gray-900">{latest.phone}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500">Kategori</h3>
+                      <p className="text-gray-900">{latest.category || "-"}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500">Device</h3>
+                      <p className="text-gray-900">{latest.deviceType || "-"}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Detail Keluhan</h3>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-gray-900">{latest.complaint}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Catatan</h3>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-gray-900">{latest.notes?.trim() ? latest.notes : "Tidak ada catatan"}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()
+      )}
+      {/* MODAL EDIT */}
+{showEditModal && editingComplaint && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg max-w-2xl w-full mx-4">
+      <div className="flex justify-between items-center p-6 border-b">
+        <h2 className="text-xl font-semibold text-gray-900">Edit Data Pelanggan</h2>
+        <button
+          onClick={() => {
+            setShowEditModal(false);
+            setEditingComplaint(null);
+            setEditFormData({});
+          }}
+          className="text-gray-400 hover:text-gray-600 transition-colors"
+          aria-label="Tutup Modal"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      
+      <div className="p-6 space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Nama</label>
+            <input
+              type="text"
+              value={editFormData.name || ""}
+              onChange={(e) => setEditFormData({...editFormData, name: e.target.value})}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Perusahaan</label>
+            <input
+              type="text"
+              value={editFormData.company || ""}
+              onChange={(e) => setEditFormData({...editFormData, company: e.target.value})}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Telepon</label>
+            <input
+              type="text"
+              value={editFormData.phone || ""}
+              onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
+            <input
+              type="text"
+              value={editFormData.category || ""}
+              onChange={(e) => setEditFormData({...editFormData, category: e.target.value})}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Device Type</label>
+            <input
+              type="text"
+              value={editFormData.deviceType || ""}
+              onChange={(e) => setEditFormData({...editFormData, deviceType: e.target.value})}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">No Internet</label>
+            <input
+              type="text"
+              value={editFormData.noInternet || ""}
+              onChange={(e) => setEditFormData({...editFormData, noInternet: e.target.value})}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Keluhan</label>
+          <textarea
+            value={editFormData.complaint || ""}
+            onChange={(e) => setEditFormData({...editFormData, complaint: e.target.value})}
+            rows={4}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+      </div>
+      
+      <div className="flex justify-end space-x-3 p-6 border-t">
+        <button
+          onClick={() => setShowEditModal(false)}
+          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+        >
+          Batal
+        </button>
+        <button
+          onClick={updateComplaint}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Simpan
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }

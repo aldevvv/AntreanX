@@ -57,15 +57,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { id, status } = req.body;
+    const { id, status, notes, name, company, phone, complaint, category, deviceType, noInternet } = req.body;
+
+    // Prepare data object - only include fields that are provided
+    const updateData: any = {};
+    if (status !== undefined) updateData.status = status;
+    if (notes !== undefined) updateData.notes = notes;
+    if (name !== undefined) updateData.name = name;
+    if (company !== undefined) updateData.company = company;
+    if (phone !== undefined) updateData.phone = phone;
+    if (complaint !== undefined) updateData.complaint = complaint;
+    if (category !== undefined) updateData.category = category;
+    if (deviceType !== undefined) updateData.deviceType = deviceType;
+    if (noInternet !== undefined) updateData.noInternet = noInternet;
 
     const updated = await prisma.complaint.update({
       where: { id },
-      data: { status },
+      data: updateData,
     });
 
     return res.status(200).json(updated);
   }
 
+  if (req.method === "DELETE") {
+    const session = await getServerSession(req, res, authOptions);
+    if (!session) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { id } = req.body;
+
+    await prisma.complaint.delete({
+      where: { id },
+    });
+
+    return res.status(200).json({ message: "Complaint deleted successfully" });
+  }
   return res.status(405).json({ error: "Method not allowed" });
 }
