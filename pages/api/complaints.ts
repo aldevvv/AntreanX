@@ -24,15 +24,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       noInternet,
     } = req.body;
 
-    const last = await prisma.complaint.findFirst({
-      orderBy: { createdAt: "desc" },
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    const lastToday = await prisma.complaint.findFirst({
+        where: {
+            createdAt: {
+                gte: today,
+            },
+        },
+        orderBy: {
+            createdAt: 'desc',
+        },
     });
 
-    let queueNumber = "A001";
-    if (last?.queueNumber) {
-      const lastNum = parseInt(last.queueNumber.slice(1)) + 1;
-      queueNumber = "A" + String(lastNum).padStart(3, "0");
+    let nextQueueNumber = 1;
+    if (lastToday?.queueNumber) {
+        nextQueueNumber = parseInt(lastToday.queueNumber.slice(1)) + 1;
     }
+
+    const queueNumber = 'A' + String(nextQueueNumber).padStart(3, '0');
 
     const created = await prisma.complaint.create({
       data: {

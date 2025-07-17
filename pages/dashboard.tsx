@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const [editFormData, setEditFormData] = useState<Partial<Complaint>>({});
   const [dateFilter, setDateFilter] = useState<'all' | '1day' | '7days' | '30days'>('all');
   const [showDateFilter, setShowDateFilter] = useState(false);
+  const [completedFilter, setCompletedFilter] = useState({ startDate: '', endDate: '' });
 
   const getFilterLabel = () => {
     switch (dateFilter) {
@@ -163,34 +164,30 @@ const deleteComplaint = async (id: string) => {
   }
 };
 
-const resetQueue = async () => {
-  if (confirm("Apakah Anda yakin ingin mereset semua nomor antrian hari ini? Tindakan ini tidak dapat dibatalkan!")) {
-    try {
-      await fetch("/api/complaints", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "reset_queue" }),
-      });
-      fetchComplaints();
-      alert("Nomor antrian berhasil direset!");
-    } catch (error) {
-      console.error("Error resetting queue:", error);
-      alert("Gagal mereset nomor antrian!");
+const handleResetQueue = async () => {
+    if (window.confirm("Apakah Anda yakin ingin mereset antrian? Tindakan ini akan menghapus semua data antrian yang belum selesai.")) {
+      try {
+        const response = await fetch('/api/admin/reset-queue', {
+          method: 'POST',
+        });
+
+        if (response.ok) {
+          alert('Antrian berhasil direset.');
+          fetchComplaints();
+        } else {
+          const error = await response.json();
+          alert(`Gagal mereset antrian: ${error.message}`);
+        }
+      } catch (error) {
+        console.error('Error resetting queue:', error);
+        alert('Terjadi kesalahan saat mereset antrian.');
+      }
     }
-  }
-};
+  };
 
 const openEditModal = (complaint: Complaint) => {
   setEditingComplaint(complaint);
-  setEditFormData({
-    name: complaint.name,
-    company: complaint.company,
-    phone: complaint.phone,
-    complaint: complaint.complaint,
-    category: complaint.category,
-    deviceType: complaint.deviceType,
-    noInternet: complaint.noInternet,
-  });
+  setEditFormData({ ...complaint, notes: complaint.notes || "" });
   setShowEditModal(true);
   setShowDropdown(null);
 };
@@ -268,7 +265,7 @@ const exportToCSV = () => {
     "No Internet",
     "Status",
     "Waktu",
-    "Catatan"
+    "Catatan Admin"
   ];
   
   // Gunakan data complaints langsung, bukan getFilteredComplaints()
@@ -350,7 +347,19 @@ const exportToCSV = () => {
 
   const activeComplaints = complaints.filter((c) => c.status !== "Selesai");
   const finished = complaints
-  .filter((c) => c.status === "Selesai")
+  .filter((c) => {
+    if (c.status !== 'Selesai') {
+      return false;
+    }
+    const complaintDate = c.createdAt.substring(0, 10);
+    if (completedFilter.startDate && complaintDate < completedFilter.startDate) {
+      return false;
+    }
+    if (completedFilter.endDate && complaintDate > completedFilter.endDate) {
+      return false;
+    }
+    return true;
+  })
   .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const paginatedOngoing = activeComplaints.slice(
@@ -569,6 +578,15 @@ const exportToCSV = () => {
           </svg>
           <span>Export ke CSV ({getFilteredComplaints().length} data)</span>
         </button>
+        <button
+          onClick={handleResetQueue}
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 9a9 9 0 0114.28-4.96M20 15a9 9 0 01-14.28 4.96"/>
+          </svg>
+          <span>Reset Antrian</span>
+        </button>
       </div>
     </div>
   </div>
@@ -658,7 +676,7 @@ const exportToCSV = () => {
                     </div>
 
                     <div className="bg-white rounded-lg p-4 border-l-4 border-blue-500 mt-4">
-  <h4 className="text-sm font-medium text-gray-900 mb-2">Catatan:</h4>
+  <h4 className="text-sm font-medium text-gray-900 mb-2">Catatan Admin:</h4>
   <textarea
     className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
     placeholder="Tulis catatan untuk pasien ini..."
@@ -764,8 +782,26 @@ const exportToCSV = () => {
                 <h2 className="text-lg font-semibold text-gray-900">Daftar Selesai</h2>
                 <p className="text-sm text-gray-600">Riwayat antrian yang telah selesai</p>
               </div>
-              <div className="text-sm text-gray-500">
-                {finished.length} antrian selesai
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="date"
+                    value={completedFilter.startDate}
+                    onChange={(e) => setCompletedFilter({...completedFilter, startDate: e.target.value})}
+                    className="px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  />
+                  <span className="text-gray-500">-</span>
+                  <input
+                    type="date"
+                    value={completedFilter.endDate}
+                    onChange={(e) => setCompletedFilter({...completedFilter, endDate: e.target.value})}
+                    className="px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
+                    min={completedFilter.startDate}
+                  />
+                </div>
+                <div className="text-sm text-gray-500">
+                  {finished.length} antrian selesai
+                </div>
               </div>
             </div>
           </div>
@@ -1066,6 +1102,15 @@ const exportToCSV = () => {
           <textarea
             value={editFormData.complaint || ""}
             onChange={(e) => setEditFormData({...editFormData, complaint: e.target.value})}
+            rows={4}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Catatan</label>
+          <textarea
+            value={editFormData.notes || ""}
+            onChange={(e) => setEditFormData({...editFormData, notes: e.target.value})}
             rows={4}
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
