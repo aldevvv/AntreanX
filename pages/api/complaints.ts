@@ -1,14 +1,49 @@
+import { subDays, startOfDay } from 'date-fns';
 import { toZonedTime, fromZonedTime, format } from 'date-fns-tz';
 import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "./auth/[...nextauth]";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const timeZone = 'Asia/Makassar';
+
   if (req.method === "GET") {
+    const { filter } = req.query;
+    
+    let where: Prisma.ComplaintWhereInput = {};
+
+    if (typeof filter === 'string' && filter !== 'all') {
+      const now = new Date();
+      const zonedNow = toZonedTime(now, timeZone);
+      let startDate: Date | undefined = undefined;
+
+      switch (filter) {
+        case 'today':
+          startDate = startOfDay(zonedNow);
+          break;
+        case 'last7days':
+          startDate = subDays(zonedNow, 7);
+          break;
+        case 'last30days':
+          startDate = subDays(zonedNow, 30);
+          break;
+        default:
+          // Invalid filter value, ignore it
+          break;
+      }
+
+      if (startDate) {
+        where.createdAt = {
+          gte: startDate,
+        };
+      }
+    }
+
     const complaints = await prisma.complaint.findMany({
+      where,
       orderBy: { createdAt: "asc" },
     });
     return res.status(200).json(complaints);
@@ -25,15 +60,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       noInternet,
     } = req.body;
 
-    const timeZone = 'Asia/Makassar';
     const now = new Date();
     const zonedNow = toZonedTime(now, timeZone);
-    const startOfDay = fromZonedTime(format(zonedNow, 'yyyy-MM-dd 00:00:00', { timeZone }), timeZone);
+    const startOfDayForToday = startOfDay(zonedNow);
 
     const lastToday = await prisma.complaint.findFirst({
         where: {
             createdAt: {
-                gte: startOfDay,
+                gte: startOfDayForToday,
             },
         },
         orderBy: {

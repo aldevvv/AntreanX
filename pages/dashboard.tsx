@@ -35,7 +35,7 @@ export default function DashboardPage() {
   const [editFormData, setEditFormData] = useState<Partial<Complaint>>({});
   const [dateFilter, setDateFilter] = useState<'all' | '1day' | '7days' | '30days'>('all');
   const [showDateFilter, setShowDateFilter] = useState(false);
-  const [completedFilter, setCompletedFilter] = useState({ startDate: '', endDate: '' });
+  const [showFinishedDateFilter, setShowFinishedDateFilter] = useState(false);
   const [showAdminDropdown, setShowAdminDropdown] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [resetPassword, setResetPassword] = useState("");
@@ -50,7 +50,7 @@ export default function DashboardPage() {
       case '30days':
         return '30 Hari Terakhir';
       default:
-        return 'Semua Data';
+        return 'Semua Waktu';
     }
   };
 
@@ -386,21 +386,8 @@ const exportToCSV = () => {
   }
 
   const activeComplaints = complaints.filter((c) => c.status !== "Selesai");
-  const finished = complaints
-  .filter((c) => {
-    if (c.status !== 'Selesai') {
-      return false;
-    }
-    const complaintDate = c.createdAt.substring(0, 10);
-    if (completedFilter.startDate && complaintDate < completedFilter.startDate) {
-      return false;
-    }
-    if (completedFilter.endDate && complaintDate > completedFilter.endDate) {
-      return false;
-    }
-    return true;
-  })
-  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const finished = getFilteredComplaints()
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const paginatedOngoing = activeComplaints.slice(
     (currentPage - 1) * itemsPerPage,
@@ -417,7 +404,7 @@ const exportToCSV = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50" onClick={() => { setShowDropdown(null); setShowDateFilter(false); }}>
+    <div className="min-h-screen bg-gray-50" onClick={() => { setShowDropdown(null); setShowDateFilter(false); setShowFinishedDateFilter(false); }}>
       <div className="relative" onClick={(e) => e.stopPropagation()}></div>
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
@@ -634,7 +621,7 @@ const exportToCSV = () => {
                     dateFilter === 'all' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
-                  Semua Data
+                  Semua Waktu
                 </button>
                 <button
                   onClick={() => {
@@ -878,21 +865,37 @@ const exportToCSV = () => {
                 <p className="text-sm text-gray-600">Riwayat antrian yang telah selesai</p>
               </div>
               <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="date"
-                    value={completedFilter.startDate}
-                    onChange={(e) => setCompletedFilter({...completedFilter, startDate: e.target.value})}
-                    className="px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
-                  />
-                  <span className="text-gray-500">-</span>
-                  <input
-                    type="date"
-                    value={completedFilter.endDate}
-                    onChange={(e) => setCompletedFilter({...completedFilter, endDate: e.target.value})}
-                    className="px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
-                    min={completedFilter.startDate}
-                  />
+                <div className="relative" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowFinishedDateFilter(!showFinishedDateFilter);
+                    }}
+                    className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    <span>Filter: {getFilterLabel()}</span>
+                    <svg className="-mr-1 ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  {showFinishedDateFilter && (
+                    <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                      <div className="py-1">
+                        <button onClick={() => { setDateFilter('all'); setShowFinishedDateFilter(false); }} className={`block w-full text-left px-4 py-2 text-sm transition-colors ${dateFilter === 'all' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+                          Semua Waktu
+                        </button>
+                        <button onClick={() => { setDateFilter('1day'); setShowFinishedDateFilter(false); }} className={`block w-full text-left px-4 py-2 text-sm transition-colors ${dateFilter === '1day' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+                          Hari Ini
+                        </button>
+                        <button onClick={() => { setDateFilter('7days'); setShowFinishedDateFilter(false); }} className={`block w-full text-left px-4 py-2 text-sm transition-colors ${dateFilter === '7days' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+                          7 Hari Terakhir
+                        </button>
+                        <button onClick={() => { setDateFilter('30days'); setShowFinishedDateFilter(false); }} className={`block w-full text-left px-4 py-2 text-sm transition-colors ${dateFilter === '30days' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+                          30 Hari Terakhir
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="text-sm text-gray-500">
                   {finished.length} antrian selesai
