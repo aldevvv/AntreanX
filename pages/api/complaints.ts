@@ -1,3 +1,4 @@
+import { toZonedTime, fromZonedTime, format } from 'date-fns-tz';
 import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "./auth/[...nextauth]";
@@ -24,19 +25,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       noInternet,
     } = req.body;
 
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+    const timeZone = 'Asia/Makassar';
+    const now = new Date();
+    const zonedNow = toZonedTime(now, timeZone);
+    const startOfDay = fromZonedTime(format(zonedNow, 'yyyy-MM-dd 00:00:00', { timeZone }), timeZone);
 
+    console.log('NEW_COMPLAINT: Looking for complaints since:', { startOfDay });
     const lastToday = await prisma.complaint.findFirst({
         where: {
-            createdAt: {
-                gte: today,
-            },
+            AND: [
+                {
+                    createdAt: {
+                        gte: startOfDay,
+                    },
+                },
+                {
+                    status: {
+                        not: 'Selesai',
+                    },
+                },
+            ],
         },
         orderBy: {
             createdAt: 'desc',
         },
     });
+    console.log('NEW_COMPLAINT: Found last complaint:', lastToday);
 
     let nextQueueNumber = 1;
     if (lastToday?.queueNumber) {
@@ -44,6 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const queueNumber = 'A' + String(nextQueueNumber).padStart(3, '0');
+    console.log('NEW_COMPLAINT: Calculated new queue number:', queueNumber);
 
     const created = await prisma.complaint.create({
       data: {

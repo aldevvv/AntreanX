@@ -23,7 +23,7 @@ model Complaint {
   phone       String
   complaint   String
   createdAt   DateTime @default(now())
-  queueNumber String?  @unique
+  queueNumber String?
   category    String?  
   deviceType  String?  
   noInternet  String?  

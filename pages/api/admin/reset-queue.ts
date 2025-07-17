@@ -1,3 +1,4 @@
+import { toZonedTime, fromZonedTime, format } from 'date-fns-tz';
 import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
@@ -13,20 +14,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-      const updatedComplaints = await prisma.complaint.updateMany({
+      // Atur zona waktu ke 'Asia/Makassar'
+      const timeZone = 'Asia/Makassar';
+      const now = new Date();
+      // Dapatkan tanggal dan waktu saat ini di zona waktu target
+      const zonedNow = toZonedTime(now, timeZone);
+      // Atur waktu ke awal hari (00:00:00) di zona waktu tersebut
+      const startOfDay = fromZonedTime(format(zonedNow, 'yyyy-MM-dd 00:00:00', { timeZone }), timeZone);
+      const endOfDay = fromZonedTime(format(zonedNow, 'yyyy-MM-dd 23:59:59', { timeZone }), timeZone);
+      console.log('RESET_QUEUE: Deleting complaints between', { startOfDay, endOfDay });
+      
+      const deletedResult = await prisma.complaint.deleteMany({
         where: {
-          status: {
-            not: "Selesai",
+          NOT: {
+            status: "Selesai",
+          },
+          createdAt: {
+            gte: startOfDay,
           },
         },
-        data: {
-          queueNumber: null,
-        },
       });
+      console.log('RESET_QUEUE: Deleted count:', deletedResult.count);
 
       return res.status(200).json({
         message: "Queue reset successfully.",
-        count: updatedComplaints.count,
+        count: deletedResult.count,
       });
     } catch (error) {
       console.error("Error resetting queue:", error);

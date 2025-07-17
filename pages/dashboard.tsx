@@ -1,7 +1,9 @@
 "use client";
 import { useSession, signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
+import { toast } from "react-hot-toast";
 import { saveAs } from "file-saver";
+import Link from "next/link";
 
 type Complaint = {
   id: string;
@@ -34,6 +36,10 @@ export default function DashboardPage() {
   const [dateFilter, setDateFilter] = useState<'all' | '1day' | '7days' | '30days'>('all');
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [completedFilter, setCompletedFilter] = useState({ startDate: '', endDate: '' });
+  const [showAdminDropdown, setShowAdminDropdown] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetPassword, setResetPassword] = useState("");
+  const [isResetQueueModalOpen, setResetQueueModalOpen] = useState(false);
 
   const getFilterLabel = () => {
     switch (dateFilter) {
@@ -164,24 +170,58 @@ const deleteComplaint = async (id: string) => {
   }
 };
 
-const handleResetQueue = async () => {
-    if (window.confirm("Apakah Anda yakin ingin mereset antrian? Tindakan ini akan menghapus semua data antrian yang belum selesai.")) {
-      try {
-        const response = await fetch('/api/admin/reset-queue', {
-          method: 'POST',
-        });
+  const handleResetQueue = () => {
+    setResetQueueModalOpen(true);
+    setShowAdminDropdown(false);
+  };
 
-        if (response.ok) {
-          alert('Antrian berhasil direset.');
-          fetchComplaints();
-        } else {
-          const error = await response.json();
-          alert(`Gagal mereset antrian: ${error.message}`);
-        }
-      } catch (error) {
-        console.error('Error resetting queue:', error);
-        alert('Terjadi kesalahan saat mereset antrian.');
+  const confirmResetQueue = async () => {
+    try {
+      const response = await fetch("/api/admin/reset-queue", {
+        method: "POST",
+      });
+
+      if (response.ok) {
+        toast.success("Antrian berhasil direset.");
+        fetchComplaints();
+      } else {
+        const error = await response.json();
+        toast.error(`Gagal mereset antrian: ${error.message}`);
       }
+    } catch (error) {
+      console.error("Error resetting queue:", error);
+      toast.error("Terjadi kesalahan saat mereset antrian.");
+    } finally {
+      setResetQueueModalOpen(false);
+    }
+  };
+
+  const handleResetDatabase = () => {
+    setIsResetModalOpen(true);
+  };
+
+  const confirmResetDatabase = async () => {
+    try {
+      const response = await fetch('/api/admin/reset-database', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password: resetPassword }),
+      });
+
+      if (response.ok) {
+        toast.success('Database berhasil direset.');
+        fetchComplaints();
+        setIsResetModalOpen(false);
+        setResetPassword('');
+      } else {
+        const errorData = await response.json();
+        toast.error(`Gagal mereset database: ${errorData.message}`);
+      }
+    } catch (error) {
+      console.error('Error while resetting database:', error);
+      toast.error('Terjadi kesalahan saat mencoba mereset database.');
     }
   };
 
@@ -408,12 +448,76 @@ const exportToCSV = () => {
                   })}
                 </p>
               </div>
-              <button
-                onClick={() => signOut({ callbackUrl: "/" })}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Logout
-              </button>
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAdminDropdown(!showAdminDropdown);
+                  }}
+                  className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition"
+                >
+                  <svg
+                    className="w-5 h-5 text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
+                {showAdminDropdown && (
+                  <div
+                    className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-gray-200 z-20"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="py-1">
+                      <div className="px-4 py-2">
+                        <p className="text-sm font-semibold text-gray-800">
+                          {session?.user?.name || "Administrator"}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Online
+                        </p>
+                      </div>
+                      <div className="border-t border-gray-100"></div>
+                      <Link
+                        href="/settings"
+                        className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <span>Pengaturan</span>
+                      </Link>
+                      <button
+                        onClick={handleResetQueue}
+                        className="flex items-center space-x-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M4 18v-5h5m11-4h-5V4m5 14h-5v-5"></path></svg>
+                        <span>Reset Nomor Antrian</span>
+                      </button>
+                      <button
+                        onClick={handleResetDatabase}
+                        className="flex items-center space-x-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        <span>Reset Database</span>
+                      </button>
+                      <div className="border-t border-gray-100"></div>
+                      <button
+                        onClick={() => signOut({ callbackUrl: "/" })}
+                        className="flex items-center space-x-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                        <span>Logout</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -578,15 +682,6 @@ const exportToCSV = () => {
           </svg>
           <span>Export ke CSV ({getFilteredComplaints().length} data)</span>
         </button>
-        <button
-          onClick={handleResetQueue}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 9a9 9 0 0114.28-4.96M20 15a9 9 0 01-14.28 4.96"/>
-          </svg>
-          <span>Reset Antrian</span>
-        </button>
       </div>
     </div>
   </div>
@@ -679,7 +774,7 @@ const exportToCSV = () => {
   <h4 className="text-sm font-medium text-gray-900 mb-2">Catatan Admin:</h4>
   <textarea
     className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-    placeholder="Tulis catatan untuk pasien ini..."
+    placeholder="Tulis catatan untuk pelanggan ini..."
     rows={3}
     value={tempNotes[c.id] ?? c.notes ?? ""}
     onChange={(e) => handleNotesChange(c.id, e.target.value)}
@@ -1134,6 +1229,111 @@ const exportToCSV = () => {
     </div>
   </div>
 )}
+
+    {isResetModalOpen && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg max-w-md w-full mx-4">
+          <div className="flex justify-between items-center p-6 border-b">
+            <h2 className="text-xl font-semibold text-gray-900">Konfirmasi Reset Database</h2>
+            <button
+              onClick={() => {
+                setIsResetModalOpen(false);
+                setResetPassword('');
+              }}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Tutup Modal"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-gray-600">
+              Tindakan ini akan menghapus semua data. Untuk melanjutkan, masukkan password Anda.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <input
+                type="password"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                placeholder="Masukkan password Anda"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end space-x-3 p-6 border-t">
+            <button
+              onClick={() => {
+                setIsResetModalOpen(false);
+                setResetPassword('');
+              }}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Batal
+            </button>
+            <button
+              onClick={confirmResetDatabase}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Hapus
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {isResetQueueModalOpen && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg max-w-md w-full mx-4">
+          <div className="flex justify-between items-center p-6 border-b">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Konfirmasi Reset Antrian
+            </h2>
+            <button
+              onClick={() => setResetQueueModalOpen(false)}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Tutup Modal"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-gray-600">
+              Apakah Anda yakin ingin mereset nomor antrian yang sedang
+              berjalan?
+            </p>
+          </div>
+          <div className="flex justify-end space-x-3 p-6 border-t">
+            <button
+              onClick={() => setResetQueueModalOpen(false)}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Batal
+            </button>
+            <button
+              onClick={confirmResetQueue}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Ya, Reset
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }
