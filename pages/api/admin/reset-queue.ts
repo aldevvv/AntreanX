@@ -22,8 +22,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Atur waktu ke awal hari (00:00:00) di zona waktu tersebut
       const startOfDay = fromZonedTime(format(zonedNow, 'yyyy-MM-dd 00:00:00', { timeZone }), timeZone);
       const endOfDay = fromZonedTime(format(zonedNow, 'yyyy-MM-dd 23:59:59', { timeZone }), timeZone);
-      console.log('RESET_QUEUE: Deleting complaints between', { startOfDay, endOfDay });
-      
       const deletedResult = await prisma.complaint.deleteMany({
         where: {
           NOT: {
@@ -34,7 +32,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         },
       });
-      console.log('RESET_QUEUE: Deleted count:', deletedResult.count);
 
       return res.status(200).json({
         message: "Queue reset successfully.",
