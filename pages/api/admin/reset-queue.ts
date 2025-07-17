@@ -24,9 +24,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const endOfDay = fromZonedTime(format(zonedNow, 'yyyy-MM-dd 23:59:59', { timeZone }), timeZone);
       const deletedResult = await prisma.complaint.deleteMany({
         where: {
-          NOT: {
-            status: "Selesai",
-          },
           createdAt: {
             gte: startOfDay,
           },

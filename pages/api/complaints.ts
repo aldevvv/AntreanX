@@ -32,18 +32,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const lastToday = await prisma.complaint.findFirst({
         where: {
-            AND: [
-                {
-                    createdAt: {
-                        gte: startOfDay,
-                    },
-                },
-                {
-                    status: {
-                        not: 'Selesai',
-                    },
-                },
-            ],
+            createdAt: {
+                gte: startOfDay,
+            },
         },
         orderBy: {
             createdAt: 'desc',
