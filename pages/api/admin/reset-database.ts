@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "POST") {
     const session = await getServerSession(req, res, authOptions);
-    if (!session) {
+    if (!session || !session.user?.email) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
