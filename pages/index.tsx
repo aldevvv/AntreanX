@@ -5,11 +5,9 @@ import Link from "next/link";
 export default function Home() {
   const [form, setForm] = useState({
     name: "",
-    company: "",
     phone: "",
     complaint: "",
     category: "",
-    deviceType: "",
     noInternet: "",
   });
   const [modalData, setModalData] = useState<any>(null);
@@ -26,7 +24,7 @@ export default function Home() {
       const res = await fetch("/api/complaints", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, company: "", deviceType: "" }),
       });
       const result = await res.json();
 
@@ -49,11 +47,9 @@ export default function Home() {
 
       setForm({
         name: "",
-        company: "",
         phone: "",
         complaint: "",
         category: "",
-        deviceType: "",
         noInternet: "",
       });
     } catch (error) {
@@ -126,33 +122,18 @@ export default function Home() {
                 <h3 className="text-lg font-semibold text-gray-900">Informasi Pribadi</h3>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Nama Lengkap <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      name="name"
-                      value={form.name}
-                      onChange={handleChange}
-                      placeholder="Masukkan nama lengkap"
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Nama Perusahaan
-                  </label>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Nama Lengkap <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
                   <input
-                    name="company"
-                    value={form.company}
+                    name="name"
+                    value={form.name}
                     onChange={handleChange}
-                    placeholder="Masukkan nama perusahaan"
+                    placeholder="Masukkan nama lengkap"
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
+                    required
                   />
                 </div>
               </div>
@@ -184,42 +165,22 @@ export default function Home() {
                 <h3 className="text-lg font-semibold text-gray-900">Informasi Layanan</h3>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Kategori Keluhan <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="category"
-                    value={form.category}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
-                    required
-                  >
-                    <option value="">Pilih kategori keluhan</option>
-                    <option value="Gangguan Internet">🌐 Gangguan Layanan</option>
-                    <option value="Layanan Tambahan">➕ Penambahan Layanan</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Jenis Layanan <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="deviceType"
-                    value={form.deviceType}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
-                    required
-                  >
-                    <option value="">Pilih jenis layanan</option>
-                    <option value="Modem">🏢 Indibiz</option>
-                    <option value="AP">📶 WMS/WIFI.ID</option>
-                    <option value="STB">🌐 Astinet</option>
-                    <option value="STB">❓ Lainnya</option>
-                  </select>
-                </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Kategori Keluhan <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="category"
+                  value={form.category}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
+                  required
+                >
+                  <option value="">Pilih kategori keluhan</option>
+                  <option value="Gangguan Internet">🌐 Gangguan Layanan</option>
+                  <option value="Layanan Tambahan">➕ Penambahan Layanan</option>
+                  <option value="Lain-lain">❓ Lain-lain</option>
+                </select>
               </div>
 
               <div className="space-y-2">

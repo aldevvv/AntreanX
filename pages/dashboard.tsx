@@ -281,8 +281,8 @@ const showComplaintDetail = (complaint: Complaint) => {
           <h2>Struk Antrian</h2>
           <div class="item"><strong>No:</strong> ${c.queueNumber}</div>
           <div class="item"><strong>Nama:</strong> ${c.name}</div>
-          <div class="item"><strong>Perusahaan:</strong> ${c.company}</div>
           <div class="item"><strong>Telepon:</strong> ${c.phone}</div>
+          <div class="item"><strong>Kategori:</strong> ${c.category || "-"}</div>
           <div class="item"><strong>Keluhan:</strong> ${c.complaint}</div>
           <hr />
           <div style="text-align:center;margin-top:20px;">${new Date(c.createdAt).toLocaleString("id-ID")}</div>
@@ -297,12 +297,10 @@ const exportToCSV = () => {
   const header = [
     "No Antrian",
     "Nama",
-    "Perusahaan",
     "Telepon",
-    "Keluhan",
     "Kategori",
-    "Device",
     "No Internet",
+    "Keluhan",
     "Status",
     "Waktu",
     "Catatan Admin"
@@ -328,31 +326,47 @@ const exportToCSV = () => {
         break;
     }
     
-    dataToExport = complaints.filter(c => 
+    dataToExport = complaints.filter(c =>
       c.status === "Selesai" && new Date(c.createdAt) >= filterDate
     );
   } else {
     dataToExport = complaints.filter(c => c.status === "Selesai");
   }
   
+  // Function to properly escape CSV values
+  const escapeCsvValue = (value: any) => {
+    if (value === null || value === undefined) return "-";
+    const stringValue = String(value);
+    
+    // Always wrap phone numbers in quotes to prevent Excel from converting to scientific notation
+    if (stringValue.match(/^\d+$/)) {
+      return `"${stringValue}"`;
+    }
+    
+    // Wrap values that contain commas, quotes, or newlines
+    if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n') || stringValue.includes('\r')) {
+      return `"${stringValue.replace(/"/g, '""')}"`;
+    }
+    
+    return stringValue;
+  };
+  
   const rows = dataToExport.map((c) => [
-    c.queueNumber,
-    c.name,
-    c.company,
-    c.phone,
-    c.complaint,
-    c.category || "-",
-    c.deviceType || "-",
-    c.noInternet || "-",
-    c.status,
-    new Date(c.createdAt).toLocaleString("id-ID"),
-    c.notes || "-"
+    escapeCsvValue(c.queueNumber),                          // No Antrian
+    escapeCsvValue(c.name),                                 // Nama
+    escapeCsvValue(c.phone),                                // Telepon (will be wrapped in quotes)
+    escapeCsvValue(c.category),                             // Kategori
+    escapeCsvValue(c.noInternet),                           // No Internet
+    escapeCsvValue(c.complaint),                            // Keluhan
+    escapeCsvValue(c.status),                               // Status
+    escapeCsvValue(new Date(c.createdAt).toLocaleString("id-ID")), // Waktu
+    escapeCsvValue(c.notes)                                 // Catatan Admin
   ]);
 
-  const csvContent =
-    "data:text/csv;charset=utf-8," +
-    [header, ...rows].map((e) => e.join(",")).join("\n");
-  const blob = new Blob([decodeURIComponent(encodeURI(csvContent))], {
+  // Create CSV content with BOM for proper UTF-8 encoding
+  const csvContent = "\uFEFF" + [header.map(escapeCsvValue), ...rows].map(row => row.join(",")).join("\n");
+  
+  const blob = new Blob([csvContent], {
     type: "text/csv;charset=utf-8;",
   });
   saveAs(blob, "antrian_pengaduan.csv");
@@ -728,23 +742,15 @@ const exportToCSV = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div className="space-y-2">
                         <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium text-gray-500 min-w-[80px]">Perusahaan:</span>
-                          <span className="text-sm text-gray-900">{c.company}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
                           <span className="text-sm font-medium text-gray-500 min-w-[80px]">Telepon:</span>
                           <span className="text-sm text-gray-900">{c.phone}</span>
                         </div>
-                      </div>
-                      <div className="space-y-2">
                         <div className="flex items-center space-x-2">
                           <span className="text-sm font-medium text-gray-500 min-w-[80px]">Kategori:</span>
                           <span className="text-sm text-gray-900">{c.category || "-"}</span>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium text-gray-500 min-w-[80px]">Device:</span>
-                          <span className="text-sm text-gray-900">{c.deviceType || "-"}</span>
-                        </div>
+                      </div>
+                      <div className="space-y-2">
                         <div className="flex items-center space-x-2">
                           <span className="text-sm font-medium text-gray-500 min-w-[80px]">No Internet:</span>
                           <span className="text-sm text-gray-900">{c.noInternet || "-"}</span>
@@ -928,7 +934,6 @@ const exportToCSV = () => {
       <h3 className="font-semibold text-gray-900">{c.name}</h3>
       <div className="flex items-center space-x-4 text-sm text-gray-500">
         <span>{c.category || "-"}</span>
-        <span>{c.deviceType || "-"}</span>
       </div>
     </div>
   </div>
@@ -1082,10 +1087,6 @@ const exportToCSV = () => {
                       <p className="text-gray-900">{latest.queueNumber}</p>
                     </div>
                     <div>
-                      <h3 className="text-sm font-medium text-gray-500">Perusahaan</h3>
-                      <p className="text-gray-900">{latest.company}</p>
-                    </div>
-                    <div>
                       <h3 className="text-sm font-medium text-gray-500">Telepon</h3>
                       <p className="text-gray-900">{latest.phone}</p>
                     </div>
@@ -1094,8 +1095,8 @@ const exportToCSV = () => {
                       <p className="text-gray-900">{latest.category || "-"}</p>
                     </div>
                     <div>
-                      <h3 className="text-sm font-medium text-gray-500">Device</h3>
-                      <p className="text-gray-900">{latest.deviceType || "-"}</p>
+                      <h3 className="text-sm font-medium text-gray-500">No Internet</h3>
+                      <p className="text-gray-900">{latest.noInternet || "-"}</p>
                     </div>
                   </div>
                   <div>
@@ -1149,15 +1150,6 @@ const exportToCSV = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Perusahaan</label>
-            <input
-              type="text"
-              value={editFormData.company || ""}
-              onChange={(e) => setEditFormData({...editFormData, company: e.target.value})}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Telepon</label>
             <input
               type="text"
@@ -1168,21 +1160,16 @@ const exportToCSV = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
-            <input
-              type="text"
+            <select
               value={editFormData.category || ""}
               onChange={(e) => setEditFormData({...editFormData, category: e.target.value})}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Device Type</label>
-            <input
-              type="text"
-              value={editFormData.deviceType || ""}
-              onChange={(e) => setEditFormData({...editFormData, deviceType: e.target.value})}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            >
+              <option value="">Pilih kategori keluhan</option>
+              <option value="Gangguan Internet">🌐 Gangguan Layanan</option>
+              <option value="Layanan Tambahan">➕ Penambahan Layanan</option>
+              <option value="Lain-lain">❓ Lain-lain</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">No Internet</label>

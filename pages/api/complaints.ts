@@ -85,11 +85,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const created = await prisma.complaint.create({
       data: {
         name,
-        company,
+        company: company || "",
         phone,
         complaint,
         category,
-        deviceType,
+        deviceType: deviceType || "",
         noInternet,
         queueNumber,
         status: "Menunggu",
